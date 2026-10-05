@@ -1,0 +1,24 @@
+# Two payments in one batch: an allocation of part of the supplier's
+# unapplied balance (after one invalid date, one unknown supplier and
+# an over-large allocation), then an ordinary payment. Batch number
+# zero is replaced by 1.
+SYS|0|0|0|;
+SUP|ACME001|Acme Supplies Ltd|1 High St;Leeds;Yorks;LS1 1AA|180.00|50.00
+SUP|BETA002|Beta Parts|9 Low Rd;York;;YO1 2BB|75.00|0.00
+OI5|ACME001|100|01/09/2026|0|0|2|INV100|PO1|||0|100.00|0|0|20.00|0|0|0|0|0|60|2.40|0|30|0||
+OI5|ACME001|101|15/09/2026|0|0|2|INV101|PO2|||0|50.00|0|0|10.00|0|0|0|0|0|0|0|0|30|0||
+OI5|BETA002|500|06/09/2026|0|0|2|INV500|PO500|||0|62.50|0|0|12.50|0|0|0|0|0|0|0|0|30|0||
+KEY|31/02/2026
+KEY|05/10/2026
+KEY|NOSUCH1
+KEY|acme001
+KEY|Y
+KEY|0000060.00
+KEY|0000030.00
+KEY|
+KEY|Y
+KEY|06/10/2026
+KEY|BETA002
+KEY|0000075.00
+KEY|
+KEY|N

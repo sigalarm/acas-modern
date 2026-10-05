@@ -1,0 +1,29 @@
+# Operator overrides on the appropriation lines of one payment:
+#  300 late (outside its discount term), operator pays o/s less the
+#      deduction and answers N to the settle prompt
+#  301 operator first enters more than is owed (Payment Too High),
+#      then a zero (No change)
+#  302 late, operator pays o/s less the deduction and answers Y
+#  303 partial payment
+#  304 proposal is the full o/s (only capped by the whole payment
+#      value, not by what is left of it), so the operator types the
+#      remainder
+SYS|12|0|0|;
+SUP|ACME001|Acme Supplies Ltd|1 High St;Leeds;Yorks;LS1 1AA|900.00|0.00
+OI5|ACME001|300|01/08/2026|0|0|2|INV300|PO300|||0|100.00|0|0|20.00|0|0|0|0|0|10|2.40|0|30|0||
+OI5|ACME001|301|02/08/2026|0|0|2|INV301|PO301|||0|50.00|0|0|10.00|0|0|0|0|0|0|0|0|30|0||
+OI5|ACME001|302|03/08/2026|0|0|2|INV302|PO302|||0|200.00|0|0|40.00|0|0|0|0|0|10|4.80|0|30|0||
+OI5|ACME001|303|04/08/2026|0|0|2|INV303|PO303|||0|80.00|0|0|16.00|0|0|0|0|0|0|0|0|30|0||
+OI5|ACME001|304|05/08/2026|0|0|2|INV304|PO304|||0|150.00|0|0|30.00|0|0|0|0|0|0|0|0|30|0||
+KEY|05/10/2026
+KEY|ACME001
+KEY|0000500.00
+KEY|0000117.60
+KEY|N
+KEY|0000070.00
+KEY|0000000.00
+KEY|0000235.20
+KEY|Y
+KEY|0000040.00
+KEY|0000107.20
+KEY|N
