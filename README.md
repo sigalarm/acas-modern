@@ -96,3 +96,5 @@ these show up and the extract posts correctly.
 - [docs/concho-usefulness-sl055.md](docs/concho-usefulness-sl055.md): where the Concho MCP helped
   during the sl055 migration, where the source and runtime had to decide, and suggested Concho
   improvements.
+- [docs/handoff-spec/](docs/handoff-spec/README.md): proposed format for Concho-generated hand-off
+  packages (App Brief + Slice Spec) for Devin, with worked ACAS examples.
