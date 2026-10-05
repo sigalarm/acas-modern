@@ -37,6 +37,7 @@ export function App() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<SavedPayment | null>(null);
   const [previewNonce, setPreviewNonce] = useState(0);
+  const [staleNotice, setStaleNotice] = useState<string | null>(null);
 
   useEffect(() => {
     api.batch()
@@ -150,6 +151,7 @@ export function App() {
     setPreview(null);
     setPreviewFor(null);
     setPreviewError(null);
+    setStaleNotice(null);
   }
 
   function changeAccount(value: string) {
@@ -176,11 +178,14 @@ export function App() {
       clearForm();
     } catch (e: unknown) {
       if (e instanceof ApiFailure && e.error?.code === 'STALE_PREVIEW') {
+        setStaleNotice(message(e));
         setPreview(null);
         setPreviewFor(null);
         setPreviewNonce((n) => n + 1);
         api.batch().then(setBatch).catch((err: unknown) => setLoadError(message(err)));
-      } else if (e instanceof ApiFailure && e.error?.appropriation) {
+        return;
+      }
+      if (e instanceof ApiFailure && e.error?.appropriation) {
         setPreview(e.error.appropriation);
       }
       setPreviewError(message(e));
@@ -314,6 +319,7 @@ export function App() {
           ) : (
             <p className="empty">Choose a supplier and enter an amount to see how it will be appropriated.</p>
           )}
+          {staleNotice ? <p className="error" role="alert">{staleNotice}</p> : null}
           {errors.length || previewError ? (
             <ul className="error" role="alert">
               {errors.map((e) => <li key={e}>{e}</li>)}
