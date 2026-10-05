@@ -247,11 +247,12 @@ export function App() {
           <fieldset disabled={entryDisabled}>
             <label>
               Payment date
-              <input type="date" value={date} required onChange={(e) => setDate(e.target.value)} />
+              <input type="date" name="date" value={date} required onChange={(e) => setDate(e.target.value)} />
             </label>
             <label>
               Supplier account
               <input
+                name="supplier"
                 list="suppliers"
                 value={account}
                 maxLength={7}
@@ -269,6 +270,7 @@ export function App() {
               <label className="check">
                 <input
                   type="checkbox"
+                  name="allocateUnapplied"
                   checked={allocate}
                   onChange={(e) => {
                     setAllocate(e.target.checked);
@@ -284,6 +286,7 @@ export function App() {
             <label>
               {allocate ? 'Amount to allocate' : 'Payment amount'}
               <input
+                name="amount"
                 inputMode="decimal"
                 value={amountText}
                 placeholder="0.00"
@@ -332,6 +335,7 @@ export function App() {
       {batch.payments.length ? (
         <section className="card payments" aria-label="Payments in this batch">
           <h2>Payments in batch {batch.batchNumber}</h2>
+          <div className="table-scroll">
           <table>
             <thead>
               <tr>
@@ -353,6 +357,7 @@ export function App() {
               ))}
             </tbody>
           </table>
+          </div>
         </section>
       ) : null}
     </div>

@@ -26,6 +26,7 @@ export function AppropriationTable({ appropriation, overrides, onOverride, disab
     return <p className="empty">No outstanding invoices: the whole amount stays unappropriated.</p>;
   }
   return (
+    <div className="table-scroll">
     <table className="appropriation">
       <thead>
         <tr>
@@ -55,6 +56,7 @@ export function AppropriationTable({ appropriation, overrides, onOverride, disab
               <td className="num">
                 {reached ? (
                   <input
+                    name={`pay-${line.invoice}`}
                     aria-label={`Pay invoice ${line.invoice}`}
                     className="amount"
                     inputMode="decimal"
@@ -70,6 +72,7 @@ export function AppropriationTable({ appropriation, overrides, onOverride, disab
                   <label className="settle">
                     <input
                       type="checkbox"
+                      name={`settle-${line.invoice}`}
                       checked={override.settleInFull ?? line.settledInFull}
                       disabled={disabled}
                       onChange={(e) => onOverride(line.invoice, { ...override, settleInFull: e.target.checked })}
@@ -97,5 +100,6 @@ export function AppropriationTable({ appropriation, overrides, onOverride, disab
         </tr>
       </tfoot>
     </table>
+    </div>
   );
 }
