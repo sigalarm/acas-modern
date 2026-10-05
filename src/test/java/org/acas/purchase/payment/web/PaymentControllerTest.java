@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,15 @@ class PaymentControllerTest {
 
     private static String payment(String body) {
         return "{\"date\":\"2026-10-05\",\"supplier\":\"acme001\"," + body + "}";
+    }
+
+    private long revision() throws Exception {
+        String batch = mvc.perform(get("/api/batch")).andReturn().getResponse().getContentAsString();
+        return JsonPath.<Number>read(batch, "$.revision").longValue();
+    }
+
+    private String revised(String body) throws Exception {
+        return body.substring(0, body.length() - 1) + ",\"revision\":" + revision() + "}";
     }
 
     @Test
@@ -70,7 +80,7 @@ class PaymentControllerTest {
     @Test
     void rejectsAnAppropriationThatIsTooHigh() throws Exception {
         mvc.perform(post("/api/payments").contentType(MediaType.APPLICATION_JSON)
-                        .content(payment("\"amount\":100.00,\"lines\":[{\"invoice\":1001,\"amount\":150.00}]")))
+                        .content(revised(payment("\"amount\":100.00,\"lines\":[{\"invoice\":1001,\"amount\":150.00}]"))))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("APPROPRIATION_ERRORS"))
                 .andExpect(jsonPath("$.appropriation.lines[0].status").value("TOO_HIGH"));
@@ -79,7 +89,7 @@ class PaymentControllerTest {
     @Test
     void savesPaymentsAndClosesTheBatch() throws Exception {
         mvc.perform(post("/api/payments").contentType(MediaType.APPLICATION_JSON)
-                        .content(payment("\"amount\":200.00")))
+                        .content(revised(payment("\"amount\":200.00"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.payment.reference").value(42001))
                 .andExpect(jsonPath("$.payment.transactionType").value(5))
@@ -96,16 +106,57 @@ class PaymentControllerTest {
     @Test
     void allocatesUnappliedBalance() throws Exception {
         mvc.perform(post("/api/payments").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"date\":\"2026-10-05\",\"supplier\":\"BETA002\",\"amount\":200.00,"
-                                + "\"allocateUnapplied\":true}"))
+                        .content(revised("{\"date\":\"2026-10-05\",\"supplier\":\"BETA002\",\"amount\":200.00,"
+                                + "\"allocateUnapplied\":true}")))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("EXCEEDS_UNAPPLIED"));
         mvc.perform(post("/api/payments").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"date\":\"2026-10-05\",\"supplier\":\"BETA002\",\"amount\":100.00,"
-                                + "\"allocateUnapplied\":true}"))
+                        .content(revised("{\"date\":\"2026-10-05\",\"supplier\":\"BETA002\",\"amount\":100.00,"
+                                + "\"allocateUnapplied\":true}")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.payment.transactionType").value(6))
                 .andExpect(jsonPath("$.batch.batchTotal").value(0.00));
         mvc.perform(get("/api/suppliers/BETA002")).andExpect(jsonPath("$.unappliedBalance").value(50.00));
+    }
+
+    @Test
+    void rejectsASaveAgainstAStalePreview() throws Exception {
+        String stale = revised(payment("\"amount\":100.00"));
+        mvc.perform(post("/api/payments").contentType(MediaType.APPLICATION_JSON)
+                        .content(revised(payment("\"amount\":50.00"))))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/payments").contentType(MediaType.APPLICATION_JSON).content(stale))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("STALE_PREVIEW"));
+        mvc.perform(post("/api/payments").contentType(MediaType.APPLICATION_JSON)
+                        .content(payment("\"amount\":100.00")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("STALE_PREVIEW"));
+        mvc.perform(get("/api/batch")).andExpect(jsonPath("$.itemCount").value(1));
+    }
+
+    @Test
+    void rejectsLineAmountsInFractionsOfAPenny() throws Exception {
+        mvc.perform(post("/api/payments/preview").contentType(MediaType.APPLICATION_JSON)
+                        .content(payment("\"amount\":10.00,\"lines\":[{\"invoice\":1001,\"amount\":1.001}]")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("INVALID_AMOUNT"));
+    }
+
+    @Test
+    void rejectsPaymentsTooLargeToAppropriate() throws Exception {
+        mvc.perform(post("/api/payments/preview").contentType(MediaType.APPLICATION_JSON)
+                        .content(payment("\"amount\":1000000.00")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("INVALID_AMOUNT"));
+    }
+
+    @Test
+    void treatsALineAboveTheRemainingPaymentAsTooHigh() throws Exception {
+        mvc.perform(post("/api/payments/preview").contentType(MediaType.APPLICATION_JSON)
+                        .content(payment("\"amount\":500.00,\"lines\":[{\"invoice\":1001,\"amount\":1000100.00}]")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lines[0].status").value("TOO_HIGH"))
+                .andExpect(jsonPath("$.valid").value(false));
     }
 }

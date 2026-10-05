@@ -71,9 +71,13 @@ public final class PurchaseLedger {
         suppliers.put(supplier.key(), supplier);
     }
 
-    /** {@code OTM5-Write}: does nothing if the key already exists, as the legacy write fails. */
-    void write(OpenItem item) {
-        openItems.putIfAbsent(item.key(), item.copy());
+    /**
+     * {@code OTM5-Write}: does nothing if the key already exists, as the legacy write fails.
+     *
+     * @return whether the record was written
+     */
+    boolean write(OpenItem item) {
+        return openItems.putIfAbsent(item.key(), item.copy()) == null;
     }
 
     /** {@code OTM5-Rewrite}. */

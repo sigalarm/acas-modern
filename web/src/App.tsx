@@ -13,6 +13,9 @@ import type {
   SupplierView,
 } from './types';
 
+// pl080 accumulates the appropriation in PIC 9(6)V99.
+const MAX_PAYMENT = 999999.99;
+
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -33,6 +36,7 @@ export function App() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<SavedPayment | null>(null);
+  const [previewNonce, setPreviewNonce] = useState(0);
 
   useEffect(() => {
     api.batch()
@@ -78,8 +82,8 @@ export function App() {
 
   const amount = parseMoney(amountText);
   let amountError: string | null = null;
-  if (amountText.trim() && amount === null) {
-    amountError = 'Enter an amount up to 9,999,999.99 with at most two decimals';
+  if (amountText.trim() && (amount === null || amount > MAX_PAYMENT)) {
+    amountError = 'Enter an amount up to 999,999.99 with at most two decimals';
   } else if (amount === 0) {
     amountError = 'Amount must be more than zero';
   } else if (allocate && supplier && amount !== null && amount > supplier.unappliedBalance) {
@@ -91,7 +95,7 @@ export function App() {
     .map(([invoice]) => `Invoice ${invoice}: enter a valid amount`);
 
   const requestKey = useMemo(() => {
-    if (!supplier || !date || amount === null || amount <= 0 || amountError || overrideErrors.length) {
+    if (!supplier || supplier.account !== accountKey || !date || amount === null || amount <= 0 || amountError || overrideErrors.length) {
       return null;
     }
     const request: PaymentRequest = {
@@ -106,7 +110,7 @@ export function App() {
       })),
     };
     return JSON.stringify(request);
-  }, [supplier, date, amount, amountError, overrideErrors.length, allocate, overrides]);
+  }, [supplier, accountKey, date, amount, amountError, overrideErrors.length, allocate, overrides]);
 
   useEffect(() => {
     if (!requestKey) {
@@ -135,7 +139,7 @@ export function App() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [requestKey]);
+  }, [requestKey, previewNonce]);
 
   function clearForm() {
     setAccount('');
@@ -148,18 +152,35 @@ export function App() {
     setPreviewError(null);
   }
 
+  function changeAccount(value: string) {
+    setAccount(value);
+    if (supplier && supplier.account !== value.trim().toUpperCase()) {
+      setSupplier(null);
+      setAllocate(false);
+      setOverrides({});
+      setPreview(null);
+      setPreviewFor(null);
+    }
+  }
+
   async function save() {
-    if (!requestKey) {
+    if (!requestKey || !preview) {
       return;
     }
     setSaving(true);
     try {
-      const result = await api.save(JSON.parse(requestKey) as PaymentRequest);
+      const request: PaymentRequest = { ...(JSON.parse(requestKey) as PaymentRequest), revision: preview.revision };
+      const result = await api.save(request);
       setSaved(result);
       setBatch(result.batch);
       clearForm();
     } catch (e: unknown) {
-      if (e instanceof ApiFailure && e.error?.appropriation) {
+      if (e instanceof ApiFailure && e.error?.code === 'STALE_PREVIEW') {
+        setPreview(null);
+        setPreviewFor(null);
+        setPreviewNonce((n) => n + 1);
+        api.batch().then(setBatch).catch((err: unknown) => setLoadError(message(err)));
+      } else if (e instanceof ApiFailure && e.error?.appropriation) {
         setPreview(e.error.appropriation);
       }
       setPreviewError(message(e));
@@ -231,7 +252,7 @@ export function App() {
                 maxLength={7}
                 autoComplete="off"
                 placeholder="e.g. ACME001"
-                onChange={(e) => setAccount(e.target.value)}
+                onChange={(e) => changeAccount(e.target.value)}
               />
               <datalist id="suppliers">
                 {suppliers.map((s) => <option key={s.account} value={s.account}>{s.name}</option>)}

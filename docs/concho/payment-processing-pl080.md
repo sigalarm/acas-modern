@@ -114,6 +114,15 @@ off or broader ranges, consistent with an older cycle:
    amount due and only reports `Payment Too High` after the operator accepts it. The API keeps
    that value as `proposal` and adds a `suggested` amount capped at the remaining payment, which
    the UI uses as its default. Behaviour on save is unchanged.
+3. **Payments of 1,000,000.00 or more wrap the appropriation total.** The payment value is
+   `PIC 9(7)V99`, but `approp-amount` is `PIC 9(6)V99`, so the accumulated appropriation loses its
+   millions digit and the payment record shows the wrong net. The domain model keeps the field
+   widths; the API rejects payments above 999,999.99, and line amounts above the remaining
+   payment are reported as `Payment Too High` before they reach the accumulator.
+4. **A payment reference that clashes with an existing item is silently lost.** The payment
+   record's invoice number (`batch × 1000 + item`) shares the open-item key space with real
+   invoices, and pl080 ignores a failed `OTM5-Write` after the invoices have been updated. The
+   API rejects such a payment instead.
 
 ## Deliberate differences from the review
 

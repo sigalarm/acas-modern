@@ -1,5 +1,6 @@
 package org.acas.purchase.payment.web;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -11,7 +12,7 @@ public final class ApiModels {
 
     public record BatchView(int batchNumber, int itemCount, int maxItems, BigDecimal batchTotal, boolean full,
                             boolean blocked, String blockedMessage, LocalDate defaultDate,
-                            List<PaymentView> payments) {
+                            List<PaymentView> payments, long revision) {
     }
 
     public record SupplierSummary(String account, String name) {
@@ -24,10 +25,11 @@ public final class ApiModels {
     /**
      * A payment to preview or save. {@code amount} is the payment value, or the part of the unapplied
      * balance to allocate when {@code allocateUnapplied} is set. {@code lines} override the amount
-     * applied to individual invoices.
+     * applied to individual invoices. Saving requires the {@code revision} of the ledger the payment
+     * was previewed against.
      */
     public record PaymentRequest(LocalDate date, String supplier, BigDecimal amount, boolean allocateUnapplied,
-                                 List<LineDecision> lines) {
+                                 List<LineDecision> lines, Long revision) {
     }
 
     /**
@@ -47,7 +49,8 @@ public final class ApiModels {
 
     public record AppropriationView(int batchNumber, int batchItem, int transactionType, BigDecimal paymentValue,
                                     BigDecimal appropriated, BigDecimal unappropriated, BigDecimal deductionTaken,
-                                    List<LineView> lines, List<String> errors) {
+                                    List<LineView> lines, List<String> errors, long revision) {
+        @JsonProperty("valid")
         public boolean valid() {
             return errors.isEmpty();
         }

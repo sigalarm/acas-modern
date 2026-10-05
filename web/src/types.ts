@@ -22,6 +22,7 @@ export interface BatchView {
   blockedMessage: string | null;
   defaultDate: string;
   payments: PaymentView[];
+  revision: number;
 }
 
 export interface SupplierSummary {
@@ -49,6 +50,7 @@ export interface PaymentRequest {
   amount: number;
   allocateUnapplied: boolean;
   lines: LineDecision[];
+  revision?: number;
 }
 
 export type LineStatus = 'CLEARED' | 'PART_PAID' | 'NO_CHANGE' | 'TOO_HIGH' | 'NOT_REACHED';
@@ -80,6 +82,7 @@ export interface AppropriationView {
   lines: LineView[];
   errors: string[];
   valid: boolean;
+  revision: number;
 }
 
 export interface SavedPayment {

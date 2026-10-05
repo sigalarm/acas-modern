@@ -19,6 +19,11 @@ class ApiExceptionHandler {
         return ResponseEntity.status(status).body(new ApiError(e.reason().name(), e.getMessage(), null));
     }
 
+    @ExceptionHandler(StalePreviewException.class)
+    ResponseEntity<ApiError> stale(StalePreviewException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError("STALE_PREVIEW", e.getMessage(), null));
+    }
+
     @ExceptionHandler(PaymentRejectedException.class)
     ResponseEntity<ApiError> rejected(PaymentRejectedException e) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)

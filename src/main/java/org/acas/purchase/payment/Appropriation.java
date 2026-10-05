@@ -36,6 +36,7 @@ public final class Appropriation {
     private BigDecimal payPaid = Fixed.ZERO;
     private boolean discountDue;
     private OfferedLine offered;
+    private boolean recordWritten;
 
     Appropriation(PaymentEntry entry, LocalDate payDate, String supplierKey, BigDecimal payValue, int type) {
         this.entry = entry;
@@ -183,6 +184,14 @@ public final class Appropriation {
         return LineOutcome.APPLIED;
     }
 
+    /**
+     * Whether {@link #finish()} stored the payment record. Like pl080, it is not stored when the
+     * supplier already has an open item with the same invoice number.
+     */
+    public boolean recordWritten() {
+        return recordWritten;
+    }
+
     /** Whether the invoice last answered is now closed (status 1). */
     public boolean lineCleared() {
         return header.isClosed();
@@ -236,7 +245,7 @@ public final class Appropriation {
         header.batchNumber = ledger.nextBatch;
         header.batchItem = entry.itemCount;
         header.invoice = Fixed.unsignedInt(header.batchNumber * 1000L + header.batchItem, 8);
-        ledger.write(header);
+        recordWritten = ledger.write(header);
         approp = Fixed.ZERO;
         deductTaken = Fixed.ZERO;
         state = State.FINISHED;

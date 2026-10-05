@@ -12,6 +12,7 @@ const view: AppropriationView = {
   deductionTaken: 9.6,
   errors: [],
   valid: true,
+  revision: 1,
   lines: [
     { invoice: 1001, date: '2026-09-01', ref: 'AC-1001', outstanding: 480, discount: 9.6, amountDue: 470.4,
       proposal: 470.4, suggested: 470.4, applied: 470.4, status: 'CLEARED', settlePrompted: false,

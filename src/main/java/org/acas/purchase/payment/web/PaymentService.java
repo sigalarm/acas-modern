@@ -39,7 +39,14 @@ import org.springframework.stereotype.Service;
 /** Holds the in-memory purchase ledger and the open payment batch. */
 @Service
 public class PaymentService {
+    /**
+     * Largest payment that can be appropriated: pl080 accepts a {@code PIC 9(7)V99} payment but
+     * accumulates the appropriation in {@code PIC 9(6)V99}, which would wrap.
+     */
+    static final BigDecimal MAX_PAYMENT = new BigDecimal("999999.99");
+
     private final Resource seed;
+    private long revision;
     private PurchaseLedger ledger;
     private PaymentEntry entry;
     private final List<PaymentView> payments = new ArrayList<>();
@@ -55,6 +62,7 @@ public class PaymentService {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+        revision++;
         openBatch();
         return batch();
     }
@@ -65,11 +73,12 @@ public class PaymentService {
                 PaymentEntry.MAX_ITEMS, blocked ? BigDecimal.ZERO.setScale(2) : entry.batchTotal(),
                 !blocked && entry.isFull(), blocked,
                 blocked ? "PL121 Invoices Not Posted; Payment Entry Not Allowed" : null, LocalDate.now(),
-                List.copyOf(payments));
+                List.copyOf(payments), revision);
     }
 
     public synchronized BatchView closeBatch() {
         requireEntry().close();
+        revision++;
         openBatch();
         return batch();
     }
@@ -95,16 +104,20 @@ public class PaymentService {
     /** Appropriates the payment against a copy of the ledger; nothing is saved. */
     public synchronized AppropriationView preview(PaymentRequest request) {
         PaymentEntry copy = requireEntry().copy(ledger.copy());
-        return appropriate(copy, request).view();
+        return appropriate(copy, request, revision).view();
     }
 
     /** Saves the payment if its appropriation has no errors. */
     public synchronized SavedPayment save(PaymentRequest request) {
+        if (request.revision() == null || request.revision() != revision) {
+            throw new StalePreviewException();
+        }
         AppropriationView preview = preview(request);
         if (!preview.valid()) {
             throw new PaymentRejectedException(preview);
         }
-        Result result = appropriate(requireEntry(), request);
+        Result result = appropriate(requireEntry(), request, revision);
+        revision++;
         PaymentView payment = payment(result.record());
         payments.add(payment);
         return new SavedPayment(payment, result.view(), batch());
@@ -113,9 +126,13 @@ public class PaymentService {
     private record Result(AppropriationView view, OpenItem record) {
     }
 
-    private static Result appropriate(PaymentEntry entry, PaymentRequest request) {
+    private static Result appropriate(PaymentEntry entry, PaymentRequest request, long revision) {
         if (request.date() == null) {
             throw new PaymentEntryException(PaymentEntryException.Reason.INVALID_DATE, "Payment date is required");
+        }
+        if (request.amount() != null && request.amount().compareTo(MAX_PAYMENT) > 0) {
+            throw new PaymentEntryException(PaymentEntryException.Reason.INVALID_AMOUNT,
+                    "Amount must be between 0.01 and " + MAX_PAYMENT);
         }
         Supplier supplier = entry.supplier(request.supplier());
         Appropriation appropriation = request.allocateUnapplied()
@@ -130,8 +147,10 @@ public class PaymentService {
         while ((next = appropriation.next()).isPresent()) {
             OfferedLine line = next.get();
             LineDecision decision = decisions.get(line.invoice());
-            BigDecimal amount = decision == null || decision.amount() == null ? line.suggested() : decision.amount();
-            LineOutcome outcome = appropriation.pay(amount);
+            BigDecimal amount = decision == null || decision.amount() == null ? line.suggested()
+                    : lineAmount(line.invoice(), decision.amount());
+            BigDecimal remaining = appropriation.paymentValue().subtract(appropriation.appropriated());
+            LineOutcome outcome = amount.compareTo(remaining) > 0 ? LineOutcome.TOO_HIGH : appropriation.pay(amount);
             if (outcome == LineOutcome.TOO_HIGH) {
                 String message = "Payment Too High";
                 errors.add("Invoice " + line.invoice() + ": " + message);
@@ -159,10 +178,23 @@ public class PaymentService {
         }
         BigDecimal appropriated = appropriation.appropriated();
         BigDecimal deduction = appropriation.deductionTaken();
+        OpenItem record = appropriation.finish();
+        if (!appropriation.recordWritten()) {
+            errors.add("Supplier " + record.supplier().strip() + " already has an item numbered " + record.invoice()
+                    + "; this payment reference cannot be used");
+        }
         AppropriationView view = new AppropriationView(entry.batchNumber(), entry.itemCount(),
                 appropriation.transactionType(), appropriation.paymentValue(), appropriated,
-                appropriation.paymentValue().subtract(appropriated), deduction, lines, errors);
-        return new Result(view, appropriation.finish());
+                appropriation.paymentValue().subtract(appropriated), deduction, lines, errors, revision);
+        return new Result(view, record);
+    }
+
+    private static BigDecimal lineAmount(long invoice, BigDecimal amount) {
+        if (amount.signum() < 0 || amount.stripTrailingZeros().scale() > 2) {
+            throw new PaymentEntryException(PaymentEntryException.Reason.INVALID_AMOUNT,
+                    "Invoice " + invoice + ": amount must be zero or more, in whole pence");
+        }
+        return amount.setScale(2);
     }
 
     private static LineView line(OfferedLine line, BigDecimal applied, LineStatus status, boolean prompted,
