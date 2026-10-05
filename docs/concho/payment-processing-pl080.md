@@ -123,6 +123,11 @@ off or broader ranges, consistent with an older cycle:
    record's invoice number (`batch × 1000 + item`) shares the open-item key space with real
    invoices, and pl080 ignores a failed `OTM5-Write` after the invoices have been updated. The
    API rejects such a payment instead.
+5. **Answering N to "settle in full" still closes the invoice.** When the amount paid equals the
+   amount due less the deduction, pl080 asks whether to settle in full. Answering N skips taking
+   the discount, but `end-line` (lines 686–689) subtracts `oi-deduct-amt` from `work-net` anyway
+   and clears the invoice when `oi-paid = work-net`. The invoice closes without the discount
+   being recorded in `deduct-taken`. Seen in the UI with BETA002, invoice 2001, paying 588.00.
 
 ## Deliberate differences from the review
 
