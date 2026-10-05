@@ -62,3 +62,9 @@ updates the expected files on purpose.
 
 With every analysis and value record configured (the `specials-configured` fixture), none of
 these show up and the extract posts correctly.
+
+## Docs
+
+- [docs/concho-usefulness-sl055.md](docs/concho-usefulness-sl055.md): where the Concho MCP helped
+  during the sl055 migration, where the source and runtime had to decide, and suggested Concho
+  improvements.
